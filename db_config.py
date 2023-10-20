@@ -8,7 +8,7 @@ def create_async_db_connection():
         'user'     : 'postgres',
         'password' : 'devpass09222023',
         'port'     : 5432,
-        'database' : "real-mgmt"
+        'database' : "z-party"
     }
 
 
