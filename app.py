@@ -1,7 +1,6 @@
-from flask import Flask
+from flask import Flask, request,render_template
 from db_config import create_async_db_connection
 from psycopg2.extras import RealDictCursor
-from flask import request
 import hashlib
 import json
 
@@ -9,13 +8,15 @@ app = Flask(__name__)
 
 # http://127.0.0.1:5000/route?variable1=x&variable2=y
 
-def execute_query(query):
+def execute_query(query, response='yes'):
     connection = create_async_db_connection()
     if connection:
         cursor = connection.cursor(cursor_factory=RealDictCursor)
         try:
             cursor.execute(query)
-            result = cursor.fetchall()
+            result = 'No response (is this a POST request?)'
+            if response == 'yes':
+                result = cursor.fetchall()
             return {"result": result, "connection": "success", "error": "none"}
         except Exception as e:
             return {"error": str(e)}
@@ -49,12 +50,12 @@ def attendance():
     return execute_query(query)
 
 
-# http://127.0.0.1:5000/events_by_account?account_name=test
-# test function
-@app.get("/events_by_account")
-def events_by_account():
+# http://127.0.0.1:5000/account/test/show_events
+# test function. maybe in the future route could be /user/show_events (login sesion stored in cache). how do we use guest accounts? 
+@app.get("/account/<account_name>/show_events")
+def events_by_account(account_name):
     # Get params from the query parameters
-    account_name = request.args.get("account_name")
+    # account_name = request.args.get("account_name")
     
     if account_name is None:
         return {"error": "Account ID or username not provided."}
@@ -63,28 +64,8 @@ def events_by_account():
     query = f"""
     SELECT e.*
     FROM events e
-    INNER JOIN attendance a ON e.event_id = a.event_id
-    WHERE a.account_name = {account_name};
-    """
-
-    # Execute the query
-    return execute_query(query)
-
-
-# http://127.0.0.1:5000/event/shocktober
-@app.route('/event/<event_name>')
-def event(event_name):
-    
-    if event_name is None:
-        return {"error": "Event Name not provided."}
-    
-    print(event_name)
-
-    # Define the query
-    query = f"""
-    SELECT *
-    FROM events
-    WHERE event_name = '{event_name}';
+    INNER JOIN attendance a ON e.event_name = a.event_name
+    WHERE a.account_name = '{account_name}';
     """
 
     # Execute the query
@@ -112,17 +93,47 @@ def show_checkin_code(account_name):
     checkin_code = f'http://127.0.0.1:5000/event/{event_name}/checkin?account_name={account_name}&hash={hash}'
     return checkin_code
 
-# def add_attendance():
-#     TEMPKEY = 'tempkey'
+# # http://127.0.0.1:5000/event/shocktober
+# @app.route('/event/<event_name>')
+# def event(event_name):
+    
+#     if event_name is None:
+#         return {"error": "Event Name not provided."}
+    
+#     print(event_name)
 
-
-#     message = account_name + event_name + TEMPKEY
-#     m = hashlib.sha256()
-#     m.update(message.encode('UTF-8'))
-#     hash = m.hexdigest()
-
+#     # Define the query
 #     query = f"""
-#         UPDATE attendance
-#         SET hash = 'YourSpecifiedValue'
-#         WHERE attendance_id = :attendance_id;
+#     SELECT *
+#     FROM events
+#     WHERE event_name = '{event_name}';
 #     """
+
+#     # Execute the query
+#     return execute_query(query)
+
+@app.route('/event/<event_name>')
+def show_form(event_name):
+    return render_template('test_form.html', event_name=event_name)
+
+@app.route('/event/<event_name>/submit', methods=['POST'])
+def add_attendance(event_name):
+
+    account_name = request.form['account_name']
+
+    TEMPKEY = 'tempkey'
+    message = account_name + event_name + TEMPKEY
+    m = hashlib.sha256()
+    m.update(message.encode('UTF-8'))
+    hash = m.hexdigest()
+
+    query = f"""
+    INSERT INTO attendance (account_name, event_name, hash, checked_in)
+    VALUES ('{account_name}', '{event_name}', '{hash}', false)
+    ON CONFLICT (account_name, event_name)
+    DO UPDATE SET hash = '{hash}';
+    """
+
+    return execute_query(query, response='no')
+    
+    # return "Form submitted successfully! Thank you, " + account_name

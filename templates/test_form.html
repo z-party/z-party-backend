@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Form</title>
+</head>
+<body>
+    <h1>Test Us</h1>
+    <form method="POST" action="/event/{{ event_name }}/submit">
+        <label for="account_name">account_name:</label>
+        <input type="text" name="account_name" id="account_name" required><br>
+
+        <input type="submit" value="Submit">
+    </form>
+</body>
+</html>
